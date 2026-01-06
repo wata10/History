@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日本史年号マスター（緑色修正版）</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --correct-color: #00a652; /* より鮮やかな緑に変更 */
+            --wrong-color: #ff5252;
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background-color: var(--bg-color);
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            width: 100%;
+            max-width: 650px;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        h1 { color: var(--primary-color); margin-bottom: 0.5rem; }
+        h2 { font-size: 1.1rem; color: #7f8c8d; font-weight: normal; margin-bottom: 2rem; }
+
+        input[type="number"], input[type="text"] {
+            width: 80%;
+            padding: 15px;
+            font-size: 1.3rem;
+            border: 2px solid #bdc3c7;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            outline: none;
+        }
+        input:focus { border-color: var(--accent-color); }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            font-size: 1.2rem;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            width: 100%;
+            max-width: 300px;
+            margin: 5px;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-next { background-color: var(--primary-color); margin-top: 15px; display: none; }
+
+        /* Quiz UI */
+        .status-bar { display: flex; justify-content: space-between; color: #95a5a6; font-weight: bold; margin-bottom: 15px; }
+        .question-text { font-size: 1.5rem; margin: 20px 0; font-weight: bold; color: var(--primary-color); }
+        .sub-badge { background-color: #f39c12; color: white; padding: 5px 12px; border-radius: 5px; font-size: 0.9rem; }
+
+        /* --- 演出用アニメーションと色設定 --- */
+        
+        /* 絵文字の色を強制的に変更するクラス */
+        .color-force-green {
+            color: transparent !important;
+            text-shadow: 0 0 0 var(--correct-color) !important;
+        }
+        
+        .color-force-red {
+            color: transparent !important;
+            text-shadow: 0 0 0 var(--wrong-color) !important;
+        }
+
+        .overlay-feedback {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 10rem;
+            background: rgba(255,255,255,0.85);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10;
+            transition: opacity 0.3s;
+        }
+        .overlay-feedback.active { opacity: 1; }
+
+        @keyframes bounce {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-10px); }
+            100% { transform: translateX(0); }
+        }
+
+        .anim-correct { animation: bounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .anim-wrong { animation: shake 0.4s ease-in-out; }
+        
+        /* メッセージエリア */
+        .feedback-msg {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            font-weight: bold;
+        }
+        .feedback-msg.correct { background: #e8f5e9; color: #1b5e20; }
+        .feedback-msg.wrong { background: #ffebee; color: #b71c1c; }
+
+        /* 結果リスト */
+        .result-list {
+            margin-top: 20px;
+            text-align: left;
+            max-height: 400px;
+            overflow-y: auto;
+            border-top: 2px solid #eee;
+        }
+        .result-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            font-size: 0.95rem;
+        }
+        .result-item.ng { background-color: #fff5f5; }
+        .result-item-header { display: flex; justify-content: space-between; font-weight: bold; }
+        .result-detail { display: flex; justify-content: space-between; margin-top: 5px; color: #555; }
+        .ans-label { font-size: 0.8rem; color: #999; }
+        
+        .mark { margin-right: 5px; font-size: 1.2rem; }
+
+        .hide { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="main-container">
+        <div id="overlay" class="overlay-feedback"></div>
+
+        <div id="start-screen">
+            <h1>日本史年号マスター</h1>
+            <h2>全10問 + ボーナス問題<br>詳細結果機能付き</h2>
+            <button class="btn" onclick="startQuiz()">クイズを始める</button>
+        </div>
+
+        <div id="quiz-screen" class="hide">
+            <div class="status-bar">
+                <span id="question-count">Q 1/10</span>
+                <span>スコア: <span id="current-score">0</span></span>
+            </div>
+
+            <div id="badge-area"></div>
+            <div class="question-text" id="question-text"></div>
+            
+            <div id="input-area"></div>
+
+            <button class="btn" id="submit-btn" onclick="checkAnswer()">回答する</button>
+            <div id="feedback-msg" class="feedback-msg"></div>
+            <button class="btn btn-next" id="next-btn" onclick="nextStep()">次へ</button>
+        </div>
+
+        <div id="result-screen" class="hide">
+            <h1>結果発表</h1>
+            <h2 id="final-score" style="font-size: 2.5rem; color: var(--accent-color); margin: 10px 0;"></h2>
+            <p id="final-comment"></p>
+            <div class="result-list" id="result-list"></div>
+            <br>
+            <button class="btn" onclick="startQuiz()">もう一度挑戦する</button>
+        </div>
+    </div>
+
+    <script>
+        const fullData = [
+  { "year": "57", "event": "奴国の王が後漢に使いを送る", "sub_question": "何の歴史書に書かれている？／金印に書かれていた文字は？", "sub_answer": "『後漢書東夷伝』／漢倭奴国王" },
+  { "year": "239", "event": "卑弥呼が魏に使いを送る", "sub_question": "何の歴史書に書かれている？", "sub_answer": "『魏志倭人伝』／親魏倭王" },
+  { "year": "552", "event": "仏教伝来", "sub_question": "どこの国から伝わった？", "sub_answer": "百済" },
+  { "year": "593", "event": "聖徳太子が摂政になる", "sub_question": "このときの天皇は誰？", "sub_answer": "推古天皇" },
+  { "year": "603", "event": "冠位十二階の制定" },
+  { "year": "604", "event": "十七条の憲法の制定" },
+  { "year": "607", "event": "第1回遣隋使", "sub_question": "隋に行ったのは誰？", "sub_answer": "小野妹子" },
+  { "year": "630", "event": "第1回遣唐使", "sub_question": "唐に行ったのは誰？", "sub_answer": "犬上御田鍬" },
+  { "year": "645", "event": "大化の改新", "sub_question": "戦ったのは誰と誰？", "sub_answer": "○中大兄皇子・中臣鎌足ー●蘇我蝦夷・蘇我入鹿" },
+  { "year": "663", "event": "白村江の戦い", "sub_question": "戦った相手はどこの国？", "sub_answer": "唐・新羅" },
+  { "year": "670", "event": "庚午年籍（最初の全国的な戸籍）" },
+  { "year": "672", "event": "壬申の乱", "sub_question": "戦ったのは誰と誰？", "sub_answer": "○大海人皇子ー●大友皇子" },
+  { "year": "694", "event": "藤原京に都を移す", "sub_question": "このときの天皇は誰？", "sub_answer": "持統天皇" },
+  { "year": "701", "event": "大宝律令の制定", "sub_question": "作ったのは誰？", "sub_answer": "刑部親王・藤原不比等" },
+  { "year": "708", "event": "和同開珎の発行" },
+  { "year": "710", "event": "平城京に都を移す", "sub_question": "このときの天皇は誰？", "sub_answer": "元明天皇" },
+  { "year": "712", "event": "『古事記』完成", "sub_question": "編纂の中心人物は？", "sub_answer": "太安万侶・稗田阿礼" },
+  { "year": "720", "event": "『日本書紀』完成", "sub_question": "編纂の中心人物は？", "sub_answer": "舎人親王" },
+  { "year": "723", "event": "三世一身の法" },
+  { "year": "741", "event": "国分寺・国分尼寺建立の詔", "sub_question": "このときの天皇は誰？", "sub_answer": "聖武天皇" },
+  { "year": "743", "event": "墾田永年私財法", "sub_question": "これにより何が発生した？", "sub_answer": "荘園" },
+  { "year": "752", "event": "東大寺の大仏開眼供養" },
+  { "year": "784", "event": "長岡京に都を移す" },
+  { "year": "794", "event": "平安京に都を移す", "sub_question": "このときの天皇は誰？", "sub_answer": "桓武天皇" },
+  { "year": "894", "event": "遣唐使の廃止", "sub_question": "建議したのは誰？", "sub_answer": "菅原道真" },
+  { "year": "905", "event": "『古今和歌集』" },
+  { "year": "935", "event": "平将門の乱", "sub_question": "どこで起きた反乱？", "sub_answer": "下総国" },
+  { "year": "939", "event": "藤原純友の乱", "sub_question": "どこで起きた反乱？", "sub_answer": "伊予国" },
+  { "year": "1016", "event": "藤原道長が摂政になる", "sub_question": "藤原道長は娘を天皇の后にすることで、どのようなポジションになった？", "sub_answer": "外戚" },
+  { "year": "1051", "event": "前九年の役", "sub_question": "活躍した源氏の親子は誰と誰？", "sub_answer": "源頼義・義家" },
+  { "year": "1083", "event": "後三年の役", "sub_question": "源義家が助けた奥州の豪族は誰？", "sub_answer": "藤原清衡" },
+  { "year": "1086", "event": "院政の開始", "sub_question": "このときの上皇は誰？", "sub_answer": "白河上皇" },
+  { "year": "1156", "event": "保元の乱", "sub_question": "戦った天皇と上皇は誰と誰？", "sub_answer": "○後白河天皇ー●崇徳上皇" },
+  { "year": "1159", "event": "平治の乱", "sub_question": "戦った平氏と源氏の棟梁は誰と誰？", "sub_answer": "○平清盛ー●源義朝" },
+  { "year": "1167", "event": "平清盛が太政大臣になる", "sub_question": "日宋貿易で修築した港の名前は？", "sub_answer": "大輪田泊" },
+  { "year": "1185", "event": "壇ノ浦の戦い（平氏滅亡）／守護・地頭の設置", "sub_question": "活躍した頼朝の弟は誰？", "sub_answer": "源義経" },
+  { "year": "1192", "event": "源頼朝が征夷大将軍になる" },
+  { "year": "1221", "event": "承久の乱", "sub_question": "戦ったのは誰と誰？／京都に設置されたのは何？", "sub_answer": "○北条義時ー●後鳥羽上皇／六波羅探題" },
+  { "year": "1232", "event": "御成敗式目の制定", "sub_question": "このときの執権は誰？", "sub_answer": "北条泰時" },
+  { "year": "1274", "event": "文永の役（元寇１回目）", "sub_question": "このときの執権は誰？", "sub_answer": "北条時宗" },
+  { "year": "1281", "event": "弘安の役（元寇２回目）", "sub_question": "この間に九州に築かれたのは何？", "sub_answer": "防塁" },
+  { "year": "1297", "event": "永仁の徳政令" },
+  { "year": "1333", "event": "鎌倉幕府滅亡", "sub_question": "鎌倉を攻め落としたのは誰？", "sub_answer": "新田義貞" },
+  { "year": "1334", "event": "建武の新政", "sub_question": "このときの天皇は誰？", "sub_answer": "後醍醐天皇" },
+  { "year": "1338", "event": "足利尊氏が征夷大将軍になる（室町幕府）" },
+  { "year": "1392", "event": "南北朝の合一", "sub_question": "このときの将軍は誰？", "sub_answer": "足利義満" },
+  { "year": "1404", "event": "勘合貿易（日明貿易）の開始" },
+  { "year": "1428", "event": "正長の土一揆", "sub_question": "農民が求めたものは？", "sub_answer": "徳政令（借金帳消し）" },
+  { "year": "1467", "event": "応仁の乱（～1477年）" },
+  { "year": "1485", "event": "山城の国一揆", "sub_question": "守護大名を追い出して自治を行ったのは何年間？", "sub_answer": "8年間" },
+  { "year": "1488", "event": "加賀の一向一揆", "sub_question": "中心となった宗派は？", "sub_answer": "浄土真宗（一向宗）" },
+  { "year": "1543", "event": "鉄砲伝来", "sub_question": "どこの国から日本のどこに伝来した？", "sub_answer": "ポルトガルから種子島へ" },
+  { "year": "1549", "event": "キリスト教伝来", "sub_question": "伝えたのは誰？／その人が所属しているのは？／どこの国から日本のどこに伝来した？", "sub_answer": "フランシスコ・ザビエル／イエズス会／スペインから鹿児島へ" },
+  { "year": "1560", "event": "桶狭間の戦い", "sub_question": "戦ったのは誰と誰？", "sub_answer": "○織田信長ー●今川義元" },
+  { "year": "1573", "event": "室町幕府滅亡", "sub_question": "最後の将軍は誰？", "sub_answer": "足利義昭" },
+  { "year": "1575", "event": "長篠の戦い", "sub_question": "戦ったのは誰と誰？", "sub_answer": "○織田信長・徳川家康ー●武田勝頼" },
+  { "year": "1582", "event": "本能寺の変／太閤検地開始", "sub_question": "織田信長を討ったのは誰？", "sub_answer": "明智光秀" },
+  { "year": "1587", "event": "バテレン追放令", "sub_question": "宣教師を追放する一方で奨励したのは何？", "sub_answer": "南蛮貿易" },
+  { "year": "1588", "event": "刀狩令", "sub_question": "何を防ぐ目的があった？／結果として何が起こった？", "sub_answer": "一揆／兵農分離" },
+  { "year": "1590", "event": "豊臣秀吉の全国統一", "sub_question": "最後に滅ぼしたのは何氏？", "sub_answer": "北条氏" },
+  { "year": "1592", "event": "文禄の役", "sub_question": "征服しようとした国は何？", "sub_answer": "明" },
+  { "year": "1597", "event": "慶長の役" },
+  { "year": "1600", "event": "関ヶ原の戦い／リーフデ号漂着", "sub_question": "関ヶ原の戦いで戦ったのは誰と誰？／リーフデ号はどこの国の船？", "sub_answer": "○徳川家康（東軍）ー●石田三成（西軍）／オランダ" },
+  { "year": "1603", "event": "徳川家康が征夷大将軍になる" },
+  { "year": "1615", "event": "大坂夏の陣／武家諸法度／禁中並公家諸法度", "sub_question": "大阪夏の陣で滅亡したのは何氏？", "sub_answer": "豊臣氏" },
+  { "year": "1635", "event": "参勤交代の制度化／日本人の海外渡航・帰国禁止", "sub_question": "このときの将軍は？／参勤交代の目的は？", "sub_answer": "徳川家光／大名に、将軍に忠誠を誓わせること" },
+  { "year": "1637", "event": "島原・天草一揆（島原の乱）", "sub_question": "一揆軍の中心人物は誰？", "sub_answer": "天草四郎（益田時貞）" },
+  { "year": "1639", "event": "ポルトガル船の来航禁止", "sub_question": "これにより完成した体制は？", "sub_answer": "鎖国" },
+  { "year": "1641", "event": "オランダ商館を長崎の出島に移す" },
+  { "year": "1657", "event": "明暦の大火" },
+  { "year": "1669", "event": "シャクシャインの戦い", "sub_question": "誰が起こした戦い？", "sub_answer": "アイヌ民族" },
+  { "year": "1685", "event": "生類憐みの令", "sub_question": "このときの将軍は？", "sub_answer": "徳川綱吉" },
+  { "year": "1709", "event": "新井白石の政治（正徳の治）" },
+  { "year": "1716", "event": "享保の改革", "sub_question": "このときの将軍は？", "sub_answer": "徳川吉宗" },
+  { "year": "1742", "event": "公事方御定書の制定" },
+  { "year": "1772", "event": "田沼意次の政治", "sub_question": "奨励したのは何？", "sub_answer": "株仲間" },
+  { "year": "1774", "event": "『解体新書』出版", "sub_question": "翻訳したのは誰？", "sub_answer": "杉田玄白・前野良沢" },
+  { "year": "1776", "event": "アメリカ独立宣言" },
+  { "year": "1782", "event": "天明の大飢饉", "sub_question": "噴火した山は？", "sub_answer": "浅間山" },
+  { "year": "1787", "event": "寛政の改革", "sub_question": "このときの老中は？", "sub_answer": "松平定信" },
+  { "year": "1789", "event": "フランス革命" },
+  { "year": "1792", "event": "ラクスマン来航", "sub_question": "どこの港に来た？", "sub_answer": "根室" },
+  { "year": "1804", "event": "レザノフ来航", "sub_question": "どこの港に来た？", "sub_answer": "長崎" },
+  { "year": "1808", "event": "フェートン号事件", "sub_question": "どこの国の船？", "sub_answer": "イギリス" },
+  { "year": "1825", "event": "異国船打払令" },
+  { "year": "1833", "event": "天保の大飢饉" },
+  { "year": "1837", "event": "大塩平八郎の乱／モリソン号事件" },
+  { "year": "1839", "event": "蛮社の獄", "sub_question": "処刑されたのは誰？／なぜ処刑された？", "sub_answer": "高野長英・渡辺崋山／異国船打払令への批判" },
+  { "year": "1840", "event": "アヘン戦争", "sub_question": "どこの国同士の戦争？", "sub_answer": "○イギリスー●清" },
+  { "year": "1841", "event": "天保の改革", "sub_question": "このときの老中は？", "sub_answer": "水野忠邦" },
+  { "year": "1842", "event": "薪水給与令", "sub_question": "モリソン号事件やアヘン戦争を受けて、これにより撤廃されたのは何？", "sub_answer": "異国船打払令" },
+  { "year": "1853", "event": "ペリー来航", "sub_question": "来航したのはどの港？", "sub_answer": "浦賀" },
+  { "year": "1854", "event": "日米和親条約", "sub_question": "他にどこの国と結んだ？／開港したのはどこ？", "sub_answer": "オランダ・イギリス・ロシア／下田・箱館" },
+  { "year": "1858", "event": "日米修好通商条約／安政の大獄", "sub_question": "他にどこの国と結んだ？／開港したのはどこ？／処刑されたのは誰？", "sub_answer": "オランダ・イギリス・フランス・ロシア／箱館・横浜・新潟・神戸・長崎／吉田松陰" },
+  { "year": "1860", "event": "桜田門外の変", "sub_question": "暗殺されたのは誰？", "sub_answer": "井伊直弼" },
+  { "year": "1862", "event": "生麦事件", "sub_question": "殺傷されたのはどこの国の人？", "sub_answer": "イギリス" },
+  { "year": "1863", "event": "薩英戦争" },
+  { "year": "1866", "event": "薩長同盟", "sub_question": "仲立ちをしたのは誰？", "sub_answer": "坂本龍馬" },
+  { "year": "1867", "event": "大政奉還／王政復古の大号令", "sub_question": "このときの将軍は？", "sub_answer": "徳川慶喜" },
+  { "year": "1868", "event": "戊辰戦争／五箇条の御誓文／明治元年", "sub_question": "戊辰戦争最後の戦いの場所は？", "sub_answer": "箱館" },
+  { "year": "1869", "event": "版籍奉還" },
+  { "year": "1871", "event": "廃藩置県／日清修好条規／岩倉使節団出発" },
+  { "year": "1872", "event": "学制／富岡製糸場／鉄道開通", "sub_question": "鉄道はどこからどこまで？", "sub_answer": "新橋ー横浜" },
+  { "year": "1873", "event": "徴兵令／地租改正", "sub_question": "地租改正のポイントは？「〇〇が〇〇の〇%を〇〇で納税」", "sub_answer": "地主が地価の3%を現金で納税" },
+  { "year": "1874", "event": "民撰議院設立の建白書", "sub_question": "提出した中心人物は？", "sub_answer": "板垣退助" },
+  { "year": "1877", "event": "西南戦争", "sub_question": "反乱軍の中心人物は？", "sub_answer": "西郷隆盛" },
+  { "year": "1881", "event": "国会開設の勅諭" },
+  { "year": "1885", "event": "内閣制度の創設", "sub_question": "初代内閣総理大臣は？", "sub_answer": "伊藤博文" },
+  { "year": "1886", "event": "ノルマントン号事件", "sub_question": "問題とあった不平等条約の内容は？", "sub_answer": "領事裁判権（治外法権）" },
+  { "year": "1889", "event": "大日本帝国憲法発布", "sub_question": "参考にしたのはどこの国の憲法？", "sub_answer": "ドイツ（プロイセン）" },
+  { "year": "1890", "event": "第1回帝国議会／教育勅語", "sub_question": "選挙権があったのは誰？", "sub_answer": "直接国税15円以上を納める25歳以上の男子" },
+  { "year": "1894", "event": "領事裁判権の撤廃／日清戦争", "sub_question": "当時の外務大臣は誰？／日清戦争の原因は？", "sub_answer": "陸奥宗光／甲午農民戦争" },
+  { "year": "1895", "event": "下関条約／三国干渉", "sub_question": "三国干渉の三国は？", "sub_answer": "ロシア・フランス・ドイツ" },
+  { "year": "1901", "event": "八幡製鉄所操業開始" },
+  { "year": "1902", "event": "日英同盟" },
+  { "year": "1904", "event": "日露戦争", "sub_question": "日本海海戦で活躍したのは誰？", "sub_answer": "東郷平八郎" },
+  { "year": "1905", "event": "ポーツマス条約／日比谷焼打事件／統監府設置", "sub_question": "統監府初代統監は誰？", "sub_answer": "伊藤博文" },
+  { "year": "1910", "event": "韓国併合", "sub_question": "ソウルに置かれた役所は何？", "sub_answer": "朝鮮総督府" },
+  { "year": "1911", "event": "関税自主権の回復","sub_question":"当時の外務大臣は？","sub_answer":"小村寿太郎" },
+  { "year": "1912", "event": "大正元年" },
+  { "year": "1914", "event": "第一次世界大戦", "sub_question": "日本が参戦した理由は？", "sub_answer": "日英同盟" },
+  { "year": "1915", "event": "二十一か条の要求", "sub_question": "要求を突きつけた相手国は？", "sub_answer": "中国" },
+  { "year": "1917", "event": "ロシア革命", "sub_question": "指導者は誰？", "sub_answer": "レーニン" },
+  { "year": "1918", "event": "米騒動", "sub_question": "このときできた初の本格的政党内閣は？", "sub_answer": "原敬内閣" },
+  { "year": "1919", "event": "ベルサイユ条約／三・一独立運動／五・四運動" },
+  { "year": "1920", "event": "国際連盟発足", "sub_question": "常任理事国は？", "sub_answer": "日本・フランス・イギリス・イタリア" },
+  { "year": "1922", "event": "全国水平社結成" },
+  { "year": "1923", "event": "関東大震災", "sub_question": "震災が起こった9月1日は「何の日」と制定されている？", "sub_answer": "防災の日" },
+  { "year": "1925", "event": "普通選挙法／治安維持法／ラジオ放送開始", "sub_question": "選挙権があったのは誰？", "sub_answer": "25歳以上の男子" },
+  { "year": "1926", "event": "昭和元年" },
+  { "year": "1929", "event": "世界恐慌" },
+  { "year": "1931", "event": "満州事変", "sub_question": "原因は？", "sub_answer": "柳条湖事件" },
+  { "year": "1932", "event": "リットン調査団／五・一五事件／満州国建国", "sub_question": "五・一五事件で暗殺されたのは？", "sub_answer": "犬養毅" },
+  { "year": "1933", "event": "国際連盟脱退" },
+  { "year": "1936", "event": "二・二六事件", "sub_question": "暗殺されたのは？", "sub_answer": "高橋是清" },
+  { "year": "1937", "event": "日中戦争", "sub_question": "原因は？", "sub_answer": "盧溝橋事件" },
+  { "year": "1938", "event": "国家総動員法" },
+  { "year": "1939", "event": "第二次世界大戦開始", "sub_question": "どこの国がどこの国に侵攻した？", "sub_answer": "ドイツがポーランドに侵攻" },
+  { "year": "1940", "event": "日独伊三国同盟" },
+  { "year": "1941", "event": "太平洋戦争開始", "sub_question": "開戦したのはどこ？／それは何月何日？", "sub_answer": "真珠湾／12月8日" },
+  { "year": "1945", "event": "終戦／国際連合発足", "sub_question": "広島への原爆投下→ソ連参戦→長崎への原爆投下→ポツダム宣言受諾→玉音放送はそれぞれ何月何日？", "sub_answer": "8月6日→8月8日→8月9日→8月14日→8月15日" },
+  { "year": "1946", "event": "日本国憲法公布／農地改革", "sub_question": "日本国憲法の公布は何月何日？", "sub_answer": "11月3日" },
+  { "year": "1947", "event": "日本国憲法施行／教育基本法・独占禁止法", "sub_question": "日本国憲法の施行は何月何日？", "sub_answer": "5月3日" },
+  { "year": "1950", "event": "朝鮮戦争／警察予備隊" },
+  { "year": "1951", "event": "サンフランシスコ平和条約／日米安保条約", "sub_question": "このときの首相は誰？", "sub_answer": "吉田茂" },
+  { "year": "1953", "event": "テレビ放送開始" },
+  { "year": "1954", "event": "自衛隊", "sub_question": "警察予備隊→〇〇隊→自衛隊", "sub_answer": "保安隊" },
+  { "year": "1956", "event": "日ソ共同宣言／国際連合加盟", "sub_question": "このときの首相は誰？", "sub_answer": "鳩山一郎" },
+  { "year": "1960", "event": "日米安保条約改定（安保闘争）", "sub_question": "このときの首相は誰？", "sub_answer": "岸信介" },
+  { "year": "1964", "event": "東京オリンピック／東海道新幹線", "sub_question": "このときの首相は誰？", "sub_answer": "池田勇人" },
+  { "year": "1965", "event": "日韓基本条約", "sub_question": "このときの首相は誰？", "sub_answer": "佐藤栄作" },
+  { "year": "1972", "event": "沖縄返還／日中共同声明" },
+  { "year": "1973", "event": "石油危機（オイルショック）", "sub_question": "原因は？", "sub_answer": "第四次中東戦争" },
+  { "year": "1978", "event": "日中平和友好条約", "sub_question": "このときの首相は誰？", "sub_answer": "田中角栄" },
+  { "year": "1989", "event": "平成元年／ベルリンの壁崩壊／消費税導入／マルタ会談", "sub_question": "消費税導入時の首相は誰？／当時何%？／この年何が終結した？", "sub_answer": "竹下登／3 %／冷戦" },
+  { "year": "1991", "event": "バブル崩壊" },
+  { "year": "1995", "event": "阪神・淡路大震災／地下鉄サリン事件", "sub_question": "阪神・淡路大震災が発生したのは何月何日？", "sub_answer": "1月17日" },
+  { "year": "1997", "event": "京都議定書（COP3）" },
+  { "year": "2001", "event": "アメリカ同時多発テロ事件", "sub_question": "発生したのは何月何日？", "sub_answer": "9月11日" },
+  { "year": "2008", "event": "リーマン・ショック（世界金融危機）" },
+  { "year": "2011", "event": "東日本大震災", "sub_question": "発生したのは何月何日？", "sub_answer": "3月11日" },
+  { "year": "2019", "event": "令和元年" }
+];
+
+        let quizQuestions = [];
+        let currentQuestionIndex = 0;
+        let isSubQuestion = false; 
+        let score = 0;
+        let userResults = []; 
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function startQuiz() {
+            const shuffled = shuffle([...fullData]);
+            quizQuestions = shuffled.slice(0, 10);
+            
+            currentQuestionIndex = 0;
+            score = 0;
+            userResults = [];
+            isSubQuestion = false;
+
+            document.getElementById('start-screen').classList.add('hide');
+            document.getElementById('result-screen').classList.add('hide');
+            document.getElementById('quiz-screen').classList.remove('hide');
+
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const data = quizQuestions[currentQuestionIndex];
+            const badgeArea = document.getElementById('badge-area');
+            const questionText = document.getElementById('question-text');
+            const inputArea = document.getElementById('input-area');
+            const feedbackMsg = document.getElementById('feedback-msg');
+            const nextBtn = document.getElementById('next-btn');
+            const submitBtn = document.getElementById('submit-btn');
+            
+            feedbackMsg.classList.remove('correct', 'wrong');
+            feedbackMsg.style.display = 'none';
+            nextBtn.style.display = 'none';
+            submitBtn.style.display = 'inline-block';
+            submitBtn.disabled = false;
+
+            document.getElementById('question-count').innerText = `Q ${currentQuestionIndex + 1} / 10`;
+            document.getElementById('current-score').innerText = score;
+
+            if (!isSubQuestion) {
+                badgeArea.innerHTML = '';
+                questionText.innerText = data.event;
+                inputArea.innerHTML = `<input type="number" id="answer-input" placeholder="年号を入力 (例: 794)" autocomplete="off">`;
+            } else {
+                badgeArea.innerHTML = `<span class="sub-badge">ボーナス問題</span>`;
+                questionText.innerText = data.sub_question;
+                inputArea.innerHTML = `<input type="text" id="answer-input" placeholder="答えを入力" autocomplete="off">`;
+            }
+
+            setTimeout(() => {
+                const input = document.getElementById('answer-input');
+                if(input) input.focus();
+            }, 100);
+
+            const input = document.getElementById('answer-input');
+            if(input) {
+                input.addEventListener("keypress", function(event) {
+                    if (event.key === "Enter") {
+                        event.preventDefault();
+                        document.getElementById("submit-btn").click();
+                    }
+                });
+            }
+        }
+
+        function checkAnswer() {
+            const input = document.getElementById('answer-input');
+            const userVal = input.value.trim();
+            const data = quizQuestions[currentQuestionIndex];
+            const feedbackMsg = document.getElementById('feedback-msg');
+            const submitBtn = document.getElementById('submit-btn');
+            const overlay = document.getElementById('overlay');
+            
+            if (!userVal) return; 
+
+            submitBtn.disabled = true;
+            let isCorrect = false;
+            let correctVal = "";
+            let questionLabel = "";
+
+            if (!isSubQuestion) {
+                questionLabel = data.event;
+                correctVal = `${data.year}年`;
+                if (userVal == data.year) isCorrect = true;
+            } else {
+                questionLabel = `(追) ${data.sub_question}`;
+                correctVal = data.sub_answer;
+                
+                const cleanUser = userVal.replace(/\s+/g, '').toLowerCase();
+                const cleanAns = data.sub_answer.replace(/\s+/g, '').toLowerCase();
+                
+                if (cleanAns.includes(cleanUser) && cleanUser.length > 1 || cleanUser.includes(cleanAns)) {
+                    isCorrect = true;
+                }
+            }
+
+            if (isCorrect) {
+                score++;
+                feedbackMsg.innerHTML = "<strong>正解！</strong>";
+                feedbackMsg.className = "feedback-msg correct";
+                
+                // ⭕アニメーション（色強制）
+                overlay.innerHTML = "⭕";
+                overlay.className = "overlay-feedback active anim-correct color-force-green";
+            } else {
+                feedbackMsg.innerHTML = `<strong>残念...</strong><br>正解は：${correctVal}`;
+                feedbackMsg.className = "feedback-msg wrong";
+                
+                // ❌アニメーション（色強制）
+                overlay.innerHTML = "❌";
+                overlay.className = "overlay-feedback active color-force-red";
+            }
+
+            setTimeout(() => {
+                overlay.className = "overlay-feedback";
+                overlay.innerHTML = "";
+            }, 600);
+
+            userResults.push({
+                question: questionLabel,
+                userAnswer: userVal,
+                correctAnswer: correctVal,
+                isCorrect: isCorrect
+            });
+
+            document.getElementById('current-score').innerText = score;
+            feedbackMsg.style.display = 'block';
+            document.getElementById('next-btn').style.display = 'inline-block';
+        }
+
+        function nextStep() {
+            const data = quizQuestions[currentQuestionIndex];
+
+            if (!isSubQuestion && data.sub_question && data.sub_answer) {
+                isSubQuestion = true;
+                showQuestion();
+            } else {
+                isSubQuestion = false;
+                currentQuestionIndex++;
+                if (currentQuestionIndex < 10) {
+                    showQuestion();
+                } else {
+                    showResult();
+                }
+            }
+        }
+
+        function showResult() {
+            document.getElementById('quiz-screen').classList.add('hide');
+            document.getElementById('result-screen').classList.remove('hide');
+            
+            document.getElementById('final-score').innerText = `${score}点`;
+            
+            const totalQs = userResults.length;
+            const rate = score / totalQs;
+            let comment = "";
+            if (rate === 1.0) comment = "完璧です！歴史マスター！🏆";
+            else if (rate >= 0.8) comment = "素晴らしい成績です！✨";
+            else if (rate >= 0.5) comment = "あと少し！復習しましょう👍";
+            else comment = "繰り返し練習しましょう📚";
+            
+            document.getElementById('final-comment').innerText = `${totalQs}問中 ${score}問正解 - ${comment}`;
+
+            const listContainer = document.getElementById('result-list');
+            listContainer.innerHTML = ""; 
+
+            userResults.forEach((res, index) => {
+                const item = document.createElement('div');
+                item.className = `result-item ${res.isCorrect ? 'ok' : 'ng'}`;
+                
+                // マークの色強制
+                const markClass = res.isCorrect ? 'color-force-green' : 'color-force-red';
+                const markSymbol = res.isCorrect ? '⭕' : '❌';
+                
+                item.innerHTML = `
+                    <div class="result-item-header">
+                        <span><span class="mark ${markClass}">${markSymbol}</span>Q${index+1}. ${res.question}</span>
+                    </div>
+                    <div class="result-detail">
+                        <div><span class="ans-label">あなた:</span> <b>${res.userAnswer}</b></div>
+                        <div><span class="ans-label">正解:</span> <b>${res.correctAnswer}</b></div>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+    </script>
+</body>
+</html>

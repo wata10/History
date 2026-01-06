@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>日本史並び替えマスター</title>
+    <style>
+        :root {
+            --primary-color: #34495e;
+            --accent-color: #3498db;
+            --correct-color: #00a652; 
+            --wrong-color: #ff5252;
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --item-bg: #ecf0f1;
+            --item-dragging: #d5dbdb;
+            
+            /* 結果画面用の色 */
+            --result-ok-bg: #e8f8f0;
+            --result-ng-bg: #ffebee;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background-color: var(--bg-color);
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            touch-action: manipulation; 
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        h1 { color: var(--primary-color); margin-bottom: 0.5rem; font-size: 1.8rem; }
+        h2 { font-size: 1rem; color: #7f8c8d; font-weight: normal; margin-bottom: 2rem; }
+
+        .sortable-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .sortable-item {
+            background-color: var(--item-bg);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
+            user-select: none;
+            touch-action: none;
+            position: relative;
+        }
+
+        .sortable-item:active { cursor: grabbing; }
+
+        .sortable-item.dragging {
+            opacity: 0.5;
+            background-color: var(--item-dragging);
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        
+        .sortable-item.selected {
+            border: 2px solid var(--accent-color);
+            background-color: #e3f2fd;
+        }
+
+        .item-rank {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-right: 15px;
+            font-size: 1.2rem;
+            min-width: 30px;
+        }
+
+        .item-text {
+            flex-grow: 1;
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+
+        .handle {
+            color: #bdc3c7;
+            font-size: 1.5rem;
+            cursor: grab;
+            margin-left: 10px;
+        }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            font-size: 1.1rem;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            max-width: 300px;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        
+        .btn-next { background-color: var(--primary-color); display: none; }
+
+        .status-bar { display: flex; justify-content: space-between; color: #95a5a6; font-weight: bold; margin-bottom: 10px; }
+        
+        .feedback-area {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+            text-align: left;
+        }
+        .feedback-area.correct { background: #e8f8f0; border: 1px solid #00a652; }
+        .feedback-area.wrong { background: #ffebee; border: 1px solid #ffcdd2; }
+        
+        .correct-order-display {
+            font-size: 0.9rem;
+            color: #555;
+            margin-top: 10px;
+        }
+        .year-tag {
+            display: inline-block;
+            background: #607d8b;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-right: 5px;
+        }
+
+        .overlay-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .overlay-symbol {
+            font-size: 10rem;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: opacity 0.3s, transform 0.3s;
+            position: absolute;
+            color: transparent !important;
+            text-shadow: 0 0 0 var(--symbol-color) !important;
+        }
+
+        .overlay-symbol.active {
+            opacity: 1;
+            transform: scale(1.2);
+            animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes pop-in {
+            0% { opacity: 0; transform: scale(0.5); }
+            60% { opacity: 1; transform: scale(1.3); }
+            100% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* --- 結果一覧画面のスタイル調整 --- */
+        .result-detail-list {
+            text-align: left;
+            margin-top: 20px;
+            border-top: 2px solid #eee;
+        }
+        .result-detail-item {
+            padding: 15px; /* 余白追加 */
+            border-bottom: 1px solid #eee;
+            border-radius: 8px; /* 角丸 */
+            margin-bottom: 10px; /* アイテム間の隙間 */
+        }
+        
+        /* 正解時のスタイル */
+        .result-detail-item.ok {
+            background-color: var(--result-ok-bg);
+            border: 1px solid #c8e6c9;
+        }
+        
+        /* 不正解時のスタイル */
+        .result-detail-item.ng {
+            background-color: var(--result-ng-bg);
+            border: 1px solid #ffcdd2;
+        }
+
+        .result-q-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+        }
+        
+        /* マークの色設定（文字色透明+影で色指定） */
+        .result-mark {
+            display: inline-block;
+            margin-right: 8px;
+            font-size: 1.4rem;
+            color: transparent;
+            text-shadow: 0 0 0 var(--mark-color);
+        }
+
+        .order-comparison {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            background: rgba(255,255,255,0.6); /* 背景を少し透過 */
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .order-col {
+            width: 48%;
+        }
+        .order-title {
+            font-weight: bold;
+            color: #7f8c8d;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+            display: block;
+        }
+        .order-row {
+            margin-bottom: 4px;
+            line-height: 1.3;
+            font-size: 0.85rem;
+        }
+
+        .hide { display: none !important; }
+
+        @media (max-width: 480px) {
+            .container { padding: 1.5rem; }
+            .item-text { font-size: 0.9rem; }
+            .order-comparison { flex-direction: column; }
+            .order-col { width: 100%; margin-bottom: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="overlay-container">
+            <div id="overlay-correct" class="overlay-symbol" style="--symbol-color: var(--correct-color);">⭕</div>
+            <div id="overlay-wrong" class="overlay-symbol" style="--symbol-color: var(--wrong-color);">❌</div>
+        </div>
+
+        <div id="start-screen">
+            <h1>日本史並び替えマスター</h1>
+            <h2>無限生成モード<br>ドラッグして並び替え！</h2>
+            <button class="btn" onclick="startGame()">スタート</button>
+        </div>
+
+        <div id="quiz-screen" class="hide">
+            <div class="status-bar">
+                <span id="q-num">Q 1/10</span>
+                <span>スコア: <span id="score">0</span></span>
+            </div>
+            <h3 style="margin: 0 0 15px 0; color: #555;" id="period-label">時代</h3>
+            <p style="font-size:0.9rem; color:#777; margin-bottom:15px;">↓ 古い順（上から）に並べてください ↓</p>
+
+            <ul class="sortable-list" id="sortable-list">
+                </ul>
+
+            <button class="btn" id="check-btn" onclick="checkOrder()">回答する</button>
+            
+            <div class="feedback-area" id="feedback">
+                <strong id="feedback-title"></strong>
+                <div class="correct-order-display" id="correct-order-list"></div>
+            </div>
+            
+            <button class="btn btn-next" id="next-btn" onclick="nextQuestion()">次の問題へ</button>
+        </div>
+
+        <div id="result-screen" class="hide">
+            <h1>終了！</h1>
+            <p>あなたの正解数は...</p>
+            <h2 id="final-score" style="font-size: 3rem; color: var(--accent-color); margin: 10px 0;"></h2>
+            <p id="final-msg"></p>
+            
+            <div id="result-detail-container" class="result-detail-list"></div>
+            
+            <button class="btn" onclick="startGame()">新しい問題で遊ぶ</button>
+        </div>
+    </div>
+
+    <script>
+        const fullHistoryData = [
+  { "year": 57, "event": "奴国の王が後漢に使いを送る" },
+  { "year": 239, "event": "卑弥呼が魏に使いを送る" },
+  { "year": 552, "event": "仏教伝来" },
+  { "year": 593, "event": "聖徳太子が摂政になる" },
+  { "year": 603, "event": "冠位十二階の制定" },
+  { "year": 604, "event": "十七条の憲法の制定" },
+  { "year": 607, "event": "第1回遣隋使" },
+  { "year": 630, "event": "第1回遣唐使" },
+  { "year": 645, "event": "大化の改新" },
+  { "year": 663, "event": "白村江の戦い" },
+  { "year": 670, "event": "庚午年籍（最初の全国的な戸籍）" },
+  { "year": 672, "event": "壬申の乱" },
+  { "year": 694, "event": "藤原京に都を移す" },
+  { "year": 701, "event": "大宝律令の制定" },
+  { "year": 708, "event": "和同開珎の発行" },
+  { "year": 710, "event": "平城京に都を移す" },
+  { "year": 712, "event": "『古事記』完成" },
+  { "year": 720, "event": "『日本書紀』完成" },
+  { "year": 723, "event": "三世一身の法" },
+  { "year": 741, "event": "国分寺・国分尼寺建立の詔" },
+  { "year": 743, "event": "墾田永年私財法" },
+  { "year": 752, "event": "東大寺の大仏開眼供養" },
+  { "year": 784, "event": "長岡京に都を移す" },
+  { "year": 794, "event": "平安京に都を移す" },
+  { "year": 894, "event": "遣唐使の廃止" },
+  { "year": 905, "event": "『古今和歌集』" },
+  { "year": 935, "event": "平将門の乱" },
+  { "year": 939, "event": "藤原純友の乱" },
+  { "year": 1016, "event": "藤原道長が摂政になる" },
+  { "year": 1051, "event": "前九年の役" },
+  { "year": 1083, "event": "後三年の役" },
+  { "year": 1086, "event": "院政の開始" },
+  { "year": 1156, "event": "保元の乱" },
+  { "year": 1159, "event": "平治の乱" },
+  { "year": 1167, "event": "平清盛が太政大臣になる" },
+  { "year": 1185, "event": "壇ノ浦の戦い（平氏滅亡）" },
+  { "year": 1192, "event": "源頼朝が征夷大将軍になる" },
+  { "year": 1221, "event": "承久の乱（六波羅探題設置）" },
+  { "year": 1232, "event": "御成敗式目の制定" },
+  { "year": 1274, "event": "文永の役" },
+  { "year": 1281, "event": "弘安の役" },
+  { "year": 1297, "event": "永仁の徳政令" },
+  { "year": 1333, "event": "鎌倉幕府滅亡" },
+  { "year": 1334, "event": "建武の新政" },
+  { "year": 1338, "event": "足利尊氏が征夷大将軍になる" },
+  { "year": 1392, "event": "南北朝の合一" },
+  { "year": 1404, "event": "勘合貿易（日明貿易）の開始" },
+  { "year": 1428, "event": "正長の土一揆" },
+  { "year": 1467, "event": "応仁の乱" },
+  { "year": 1485, "event": "山城の国一揆" },
+  { "year": 1488, "event": "加賀の一向一揆" },
+  { "year": 1543, "event": "鉄砲伝来" },
+  { "year": 1549, "event": "キリスト教伝来" },
+  { "year": 1560, "event": "桶狭間の戦い" },
+  { "year": 1573, "event": "室町幕府滅亡" },
+  { "year": 1575, "event": "長篠の戦い" },
+  { "year": 1582, "event": "本能寺の変／太閤検地開始" },
+  { "year": 1587, "event": "バテレン追放令" },
+  { "year": 1588, "event": "刀狩令" },
+  { "year": 1590, "event": "豊臣秀吉の全国統一" },
+  { "year": 1592, "event": "文禄の役" },
+  { "year": 1597, "event": "慶長の役" },
+  { "year": 1600, "event": "関ヶ原の戦い／リーフデ号漂着" },
+  { "year": 1603, "event": "徳川家康が征夷大将軍になる" },
+  { "year": 1615, "event": "大坂夏の陣／武家諸法度" },
+  { "year": 1635, "event": "参勤交代の制度化" },
+  { "year": 1637, "event": "島原・天草一揆" },
+  { "year": 1639, "event": "ポルトガル船の来航禁止（鎖国）" },
+  { "year": 1641, "event": "オランダ商館を長崎の出島に移す" },
+  { "year": 1657, "event": "明暦の大火" },
+  { "year": 1669, "event": "シャクシャインの戦い" },
+  { "year": 1685, "event": "生類憐みの令" },
+  { "year": 1709, "event": "新井白石の政治" },
+  { "year": 1716, "event": "享保の改革" },
+  { "year": 1742, "event": "公事方御定書の制定" },
+  { "year": 1772, "event": "田沼意次の政治" },
+  { "year": 1774, "event": "『解体新書』出版" },
+  { "year": 1776, "event": "アメリカ独立宣言" },
+  { "year": 1782, "event": "天明の大飢饉" },
+  { "year": 1787, "event": "寛政の改革" },
+  { "year": 1789, "event": "フランス革命" },
+  { "year": 1792, "event": "ラクスマン来航" },
+  { "year": 1804, "event": "レザノフ来航" },
+  { "year": 1808, "event": "フェートン号事件" },
+  { "year": 1825, "event": "異国船打払令" },
+  { "year": 1833, "event": "天保の大飢饉" },
+  { "year": 1837, "event": "大塩平八郎の乱" },
+  { "year": 1839, "event": "蛮社の獄" },
+  { "year": 1840, "event": "アヘン戦争" },
+  { "year": 1841, "event": "天保の改革" },
+  { "year": 1842, "event": "薪水給与令" },
+  { "year": 1853, "event": "ペリー来航" },
+  { "year": 1854, "event": "日米和親条約" },
+  { "year": 1858, "event": "日米修好通商条約" },
+  { "year": 1860, "event": "桜田門外の変" },
+  { "year": 1862, "event": "生麦事件" },
+  { "year": 1863, "event": "薩英戦争" },
+  { "year": 1866, "event": "薩長同盟" },
+  { "year": 1867, "event": "大政奉還" },
+  { "year": 1868, "event": "戊辰戦争／明治元年" },
+  { "year": 1869, "event": "版籍奉還" },
+  { "year": 1871, "event": "廃藩置県" },
+  { "year": 1872, "event": "学制／鉄道開通" },
+  { "year": 1873, "event": "徴兵令／地租改正" },
+  { "year": 1874, "event": "民撰議院設立の建白書" },
+  { "year": 1877, "event": "西南戦争" },
+  { "year": 1881, "event": "国会開設の勅諭" },
+  { "year": 1885, "event": "内閣制度の創設" },
+  { "year": 1886, "event": "ノルマントン号事件" },
+  { "year": 1889, "event": "大日本帝国憲法発布" },
+  { "year": 1890, "event": "第1回帝国議会／教育勅語" },
+  { "year": 1894, "event": "領事裁判権の撤廃／日清戦争" },
+  { "year": 1895, "event": "下関条約／三国干渉" },
+  { "year": 1901, "event": "八幡製鉄所操業開始" },
+  { "year": 1902, "event": "日英同盟" },
+  { "year": 1904, "event": "日露戦争" },
+  { "year": 1905, "event": "ポーツマス条約／日比谷焼打事件" },
+  { "year": 1910, "event": "韓国併合" },
+  { "year": 1911, "event": "関税自主権の回復" },
+  { "year": 1912, "event": "大正元年" },
+  { "year": 1914, "event": "第一次世界大戦" },
+  { "year": 1915, "event": "二十一か条の要求" },
+  { "year": 1917, "event": "ロシア革命" },
+  { "year": 1918, "event": "米騒動" },
+  { "year": 1919, "event": "ベルサイユ条約" },
+  { "year": 1920, "event": "国際連盟発足" },
+  { "year": 1922, "event": "全国水平社結成" },
+  { "year": 1923, "event": "関東大震災" },
+  { "year": 1925, "event": "普通選挙法／治安維持法" },
+  { "year": 1926, "event": "昭和元年" },
+  { "year": 1929, "event": "世界恐慌" },
+  { "year": 1931, "event": "満州事変" },
+  { "year": 1932, "event": "五・一五事件／満州国建国" },
+  { "year": 1933, "event": "国際連盟脱退" },
+  { "year": 1936, "event": "二・二六事件" },
+  { "year": 1937, "event": "日中戦争" },
+  { "year": 1938, "event": "国家総動員法" },
+  { "year": 1939, "event": "第二次世界大戦開始" },
+  { "year": 1940, "event": "日独伊三国同盟" },
+  { "year": 1941, "event": "太平洋戦争開始" },
+  { "year": 1945, "event": "終戦／国際連合発足" },
+  { "year": 1946, "event": "日本国憲法公布／農地改革" },
+  { "year": 1947, "event": "日本国憲法施行／独占禁止法" },
+  { "year": 1950, "event": "朝鮮戦争" },
+  { "year": 1951, "event": "サンフランシスコ平和条約" },
+  { "year": 1953, "event": "テレビ放送開始" },
+  { "year": 1954, "event": "自衛隊発足" },
+  { "year": 1956, "event": "日ソ共同宣言／国際連合加盟" },
+  { "year": 1960, "event": "日米安保条約改定" },
+  { "year": 1964, "event": "東京オリンピック" },
+  { "year": 1965, "event": "日韓基本条約" },
+  { "year": 1972, "event": "沖縄返還／日中共同声明" },
+  { "year": 1973, "event": "石油危機（オイルショック）" },
+  { "year": 1978, "event": "日中平和友好条約" },
+  { "year": 1989, "event": "平成元年／消費税導入" },
+  { "year": 1991, "event": "バブル崩壊" },
+  { "year": 1995, "event": "阪神・淡路大震災" },
+  { "year": 1997, "event": "京都議定書" },
+  { "year": 2001, "event": "アメリカ同時多発テロ事件" },
+  { "year": 2008, "event": "リーマン・ショック" },
+  { "year": 2011, "event": "東日本大震災" },
+  { "year": 2019, "event": "令和元年" }
+];
+
+        const periodDefinitions = [
+            { name: "飛鳥・奈良時代", start: 0, end: 793 },
+            { name: "平安時代", start: 794, end: 1184 },
+            { name: "鎌倉時代", start: 1185, end: 1332 },
+            { name: "室町・安土桃山時代", start: 1333, end: 1602 },
+            { name: "江戸時代（前期）", start: 1603, end: 1750 },
+            { name: "江戸時代（後期）～幕末", start: 1751, end: 1867 },
+            { name: "明治時代", start: 1868, end: 1911 },
+            { name: "大正・昭和（戦前）", start: 1912, end: 1944 },
+            { name: "昭和（戦後）", start: 1945, end: 1988 },
+            { name: "平成・令和", start: 1989, end: 2025 }
+        ];
+
+        let currentQuizData = [];
+        let currentQIndex = 0;
+        let score = 0;
+        let currentItems = [];
+        let userAnswersLog = [];
+
+        function startGame() {
+            generateQuiz();
+            document.getElementById('start-screen').classList.add('hide');
+            document.getElementById('result-screen').classList.add('hide');
+            document.getElementById('quiz-screen').classList.remove('hide');
+            score = 0;
+            currentQIndex = 0;
+            userAnswersLog = [];
+            loadQuestion();
+        }
+
+        function generateQuiz() {
+            currentQuizData = [];
+            
+            periodDefinitions.forEach(period => {
+                const candidates = fullHistoryData.filter(e => e.year >= period.start && e.year <= period.end);
+                
+                const byYear = {};
+                candidates.forEach(c => {
+                    if(!byYear[c.year]) byYear[c.year] = [];
+                    byYear[c.year].push(c);
+                });
+                
+                const uniqueYearCandidates = Object.keys(byYear).map(y => {
+                    const list = byYear[y];
+                    return list[Math.floor(Math.random() * list.length)];
+                });
+
+                if (uniqueYearCandidates.length >= 4) {
+                    const selected = shuffle(uniqueYearCandidates).slice(0, 4);
+                    selected.sort((a, b) => a.year - b.year);
+                    currentQuizData.push({
+                        period: period.name,
+                        events: selected.map(e => ({ year: e.year, text: e.event }))
+                    });
+                } else {
+                    const selected = uniqueYearCandidates.sort((a, b) => a.year - b.year);
+                    currentQuizData.push({
+                        period: period.name,
+                        events: selected.map(e => ({ year: e.year, text: e.event }))
+                    });
+                }
+            });
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function loadQuestion() {
+            const q = currentQuizData[currentQIndex];
+            
+            document.getElementById('q-num').innerText = `Q ${currentQIndex + 1} / 10`;
+            document.getElementById('score').innerText = score;
+            document.getElementById('period-label').innerText = q.period;
+            document.getElementById('feedback').style.display = 'none';
+            document.getElementById('feedback').classList.remove('correct', 'wrong');
+            document.getElementById('check-btn').style.display = 'inline-block';
+            document.getElementById('check-btn').disabled = false;
+            document.getElementById('next-btn').style.display = 'none';
+
+            currentItems = shuffle([...q.events]); 
+            renderList();
+        }
+
+        function renderList() {
+            const list = document.getElementById('sortable-list');
+            list.innerHTML = '';
+
+            currentItems.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'sortable-item';
+                li.setAttribute('draggable', 'true');
+                li.dataset.index = index;
+
+                li.innerHTML = `
+                    <span class="item-rank">${index + 1}</span>
+                    <span class="item-text">${item.text}</span>
+                    <span class="handle">☰</span>
+                `;
+
+                addDragEvents(li);
+                addTouchEvents(li);
+                list.appendChild(li);
+            });
+        }
+
+        let dragStartIndex;
+
+        function addDragEvents(item) {
+            item.addEventListener('dragstart', () => {
+                dragStartIndex = +item.dataset.index;
+                item.classList.add('dragging');
+            });
+            item.addEventListener('dragover', (e) => e.preventDefault());
+            item.addEventListener('drop', () => {
+                const dragEndIndex = +item.dataset.index;
+                swapItems(dragStartIndex, dragEndIndex);
+                item.classList.remove('dragging');
+            });
+            item.addEventListener('dragenter', () => item.style.backgroundColor = '#e3f2fd');
+            item.addEventListener('dragleave', () => item.style.backgroundColor = '');
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+                document.querySelectorAll('.sortable-item').forEach(el => el.style.backgroundColor = '');
+            });
+        }
+
+        let selectedIndex = null;
+
+        function addTouchEvents(item) {
+            item.addEventListener('click', () => {
+                if(document.getElementById('check-btn').disabled) return;
+                const index = +item.dataset.index;
+                if (selectedIndex === null) {
+                    selectedIndex = index;
+                    item.classList.add('selected');
+                } else if (selectedIndex === index) {
+                    selectedIndex = null;
+                    item.classList.remove('selected');
+                } else {
+                    swapItems(selectedIndex, index);
+                    selectedIndex = null;
+                }
+            });
+        }
+
+        function swapItems(fromIndex, toIndex) {
+            const itemOne = currentItems[fromIndex];
+            const itemTwo = currentItems[toIndex];
+            currentItems[fromIndex] = itemTwo;
+            currentItems[toIndex] = itemOne;
+            renderList();
+        }
+
+        function checkOrder() {
+            const feedback = document.getElementById('feedback');
+            const feedbackTitle = document.getElementById('feedback-title');
+            const correctOrderList = document.getElementById('correct-order-list');
+            const checkBtn = document.getElementById('check-btn');
+            
+            const overlayCorrect = document.getElementById('overlay-correct');
+            const overlayWrong = document.getElementById('overlay-wrong');
+
+            checkBtn.disabled = true;
+
+            let isCorrect = true;
+            for (let i = 0; i < currentItems.length - 1; i++) {
+                if (currentItems[i].year > currentItems[i+1].year) {
+                    isCorrect = false;
+                    break;
+                }
+            }
+
+            const correctItems = currentQuizData[currentQIndex].events;
+            
+            userAnswersLog.push({
+                questionTitle: `Q${currentQIndex + 1} (${currentQuizData[currentQIndex].period})`,
+                isCorrect: isCorrect,
+                userOrder: [...currentItems], 
+                correctOrder: [...correctItems]
+            });
+
+            feedback.style.display = 'block';
+
+            if (isCorrect) {
+                score++;
+                document.getElementById('score').innerText = score;
+                feedbackTitle.innerText = "大正解！";
+                feedbackTitle.style.color = "var(--correct-color)";
+                feedback.className = "feedback-area correct";
+                
+                overlayCorrect.classList.add('active');
+                setTimeout(() => overlayCorrect.classList.remove('active'), 600);
+                
+                correctOrderList.innerText = "";
+            } else {
+                feedbackTitle.innerText = "残念...";
+                feedbackTitle.style.color = "var(--wrong-color)";
+                feedback.className = "feedback-area wrong";
+                
+                overlayWrong.classList.add('active');
+                setTimeout(() => overlayWrong.classList.remove('active'), 600);
+                
+                let html = "<strong>正しい順番:</strong><br>";
+                correctItems.forEach((item, idx) => {
+                    html += `<div style="margin-top:4px;">${idx+1}. <span class="year-tag">${item.year}年</span> ${item.text}</div>`;
+                });
+                correctOrderList.innerHTML = html;
+            }
+
+            document.getElementById('next-btn').style.display = 'inline-block';
+        }
+
+        function nextQuestion() {
+            currentQIndex++;
+            if (currentQIndex < 10) {
+                loadQuestion();
+            } else {
+                showResult();
+            }
+        }
+
+        function showResult() {
+            document.getElementById('quiz-screen').classList.add('hide');
+            document.getElementById('result-screen').classList.remove('hide');
+            document.getElementById('final-score').innerText = `${score} / 10`;
+            
+            const msg = document.getElementById('final-msg');
+            if(score === 10) msg.innerText = "歴史の流れを完璧に理解しています！素晴らしい！🏆";
+            else if(score >= 7) msg.innerText = "惜しい！あと少しで満点です。👍";
+            else msg.innerText = "時代の流れを復習して、再挑戦しましょう！📚";
+
+            const container = document.getElementById('result-detail-container');
+            container.innerHTML = "";
+
+            userAnswersLog.forEach((log) => {
+                const item = document.createElement('div');
+                item.className = `result-detail-item ${log.isCorrect ? 'ok' : 'ng'}`;
+                
+                const markClass = log.isCorrect ? 'ok' : 'ng';
+                const markSymbol = log.isCorrect ? '⭕' : '❌';
+                // マークの色設定
+                const markColorVar = log.isCorrect ? 'var(--correct-color)' : 'var(--wrong-color)';
+
+                let html = `
+                    <div class="result-q-header">
+                        <span class="result-mark" style="--mark-color: ${markColorVar}">${markSymbol}</span> ${log.questionTitle}
+                    </div>
+                    <div class="order-comparison">
+                        <div class="order-col">
+                            <span class="order-title">あなたの回答</span>
+                            ${log.userOrder.map((e, i) => `<div class="order-row">${i+1}. ${e.text}</div>`).join('')}
+                        </div>
+                        <div class="order-col">
+                            <span class="order-title">正解</span>
+                            ${log.correctOrder.map((e, i) => `<div class="order-row">${i+1}. ${e.text}</div>`).join('')}
+                        </div>
+                    </div>
+                `;
+                item.innerHTML = html;
+                container.appendChild(item);
+            });
+        }
+    </script>
+</body>
+</html>
